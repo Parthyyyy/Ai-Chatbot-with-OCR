@@ -1,0 +1,4 @@
+User: summarize in 20 words
+Bot: Parth Akhand is a B.Tech graduate from Medicaps University with skills in AI, ML, and web development, and experience in chatbot and fabric defect detection projects.
+
+

@@ -1,0 +1,16 @@
+User: who is parth akhand in 20 words
+Bot: Parth Akhand is a B.Tech graduate in Computer Science & Engineering from Medicaps University, skilled in AI and Machine Learning.
+
+
+User: who is parth akhand in 20 words
+Bot: Parth Akhand is a computer science graduate with AI chatbot and fabric defect detection project experience.
+
+
+User: who is parta Khand in
+Bot: There is no individual named "Parta Khand" in the provided document.  The document refers to "Parth Akhand".
+
+
+User: summarise in 20 words
+Bot: Parth Akhand is a skilled computer science graduate with AI and machine learning project experience.
+
+

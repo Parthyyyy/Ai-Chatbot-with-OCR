@@ -1,0 +1,4 @@
+User: summarise the PDF in 10 words
+Bot: Data science student with full-stack internship and diverse tech skills.
+
+

@@ -1,0 +1,3 @@
+User: 1 files
+Bot: Please load a file first using 'load <file_path>' command.
+

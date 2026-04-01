@@ -1,0 +1,4 @@
+User: who is anvi goyal in 20 words
+Bot: Anvi Goyal is a data science student at Medi-Caps University, a full-stack intern, and community lead with skills in Python, FastAPI, and various web technologies.
+
+

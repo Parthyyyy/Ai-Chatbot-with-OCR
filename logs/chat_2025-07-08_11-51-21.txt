@@ -1,0 +1,6 @@
+User: anvi
+Bot: Please load a file first using 'load <file_path>' command.
+
+User: parth
+Bot: Please load a file first using 'load <file_path>' command.
+

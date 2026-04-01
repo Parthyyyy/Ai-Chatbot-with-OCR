@@ -1,0 +1,18 @@
+User: who is anvi
+Bot: Please load a file first using 'load <file_path>' command.
+
+User: who is anvi
+Bot: Please load a file first using 'load <file_path>' command.
+
+User: who is anvi in 100 words
+Bot: Please load a file first using 'load <file_path>' command.
+
+User: who is anvi in 100 words
+Bot: Please load a file first using 'load <file_path>' command.
+
+User: who is anvi in 100 words
+Bot: Please load a file first using 'load <file_path>' command.
+
+User: who is anvi in 100 words
+Bot: Please load a file first using 'load <file_path>' command.
+
