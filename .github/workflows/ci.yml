@@ -4,7 +4,10 @@ on:
   push:
     branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches:[ "main", "master" ]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-test:
@@ -17,7 +20,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # Adjust if you are using a different version
+        python-version: '3.10'
         cache: 'pip'
 
     - name: Install System Dependencies
@@ -33,7 +36,7 @@ jobs:
 
     - name: Run Tests
       env:
-        GOOGLE_API_KEY: "dummy_key_for_testing" # Prevents app.py from crashing on import
+        GOOGLE_API_KEY: "dummy_key_for_testing"
         SECRET_KEY: "dummy_secret"
       run: |
         pytest tests/

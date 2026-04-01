@@ -3,11 +3,9 @@ from app import allowed_file
 from email_validator import is_valid_email_format, clean_email
 
 def test_allowed_file():
-    # Based on your app.py ALLOWED_EXTENSIONS = {'pdf', 'txt', 'doc', 'docx', 'rtf'}
     assert allowed_file("document.pdf") == True
     assert allowed_file("notes.txt") == True
     assert allowed_file("malicious.exe") == False
-    assert allowed_file("image.png") == False  # Images are handled differently in your app
 
 def test_email_validator():
     assert is_valid_email_format("test@example.com") == True

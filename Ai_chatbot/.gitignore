@@ -71,7 +71,6 @@ test-results/
 # Ignore build artifacts
 *.egg-info/
 
-
 # Application specific
 uploads/
 logs/
