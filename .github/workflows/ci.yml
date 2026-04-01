@@ -39,4 +39,4 @@ jobs:
         GOOGLE_API_KEY: "dummy_key_for_testing"
         SECRET_KEY: "dummy_secret"
       run: |
-        pytest tests/
+        PYTHONPATH=. python -m pytest tests/
