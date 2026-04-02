@@ -8,6 +8,8 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 import uuid
 from dotenv import load_dotenv
 import docx
+import time
+from threading import Lock
 import boto3
 import google.generativeai as genai
 import cv2
@@ -37,8 +39,9 @@ def log_conversation(user_input, bot_response, override=False):
     try:
         log_path = session.get('chat_log_path')
         if not log_path:
-            print("⚠️ No log path set for this session.")
-            return
+            # Fallback if no session path
+            log_path = CHAT_LOG_PATH
+            
         full_path = os.path.join(os.getcwd(), log_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         mode = 'w' if override else 'a'
@@ -47,17 +50,7 @@ def log_conversation(user_input, bot_response, override=False):
             f.write(f"Bot: {bot_response}\n\n")
         print("📝 Logged to:", full_path)
     except Exception as e:
-        print("❌ Logging error:",e)
-
-
-        os.makedirs(LOG_DIR, exist_ok=True)
-        mode = 'w' if override else 'a'
-        with open(CHAT_LOG_PATH, mode, encoding='utf-8') as f:
-            f.write(f"User: {user_input}\n")
-            f.write(f"Bot: {bot_response}\n\n")
-        print("📝 Chat logged successfully at ", CHAT_LOG_PATH)
-    except Exception as e:
-        print("❌ Error logging chat:", e)
+        print("❌ Logging error:", e)
 
 ALLOWED_EXTENSIONS = {'pdf', 'txt', 'doc', 'docx', 'rtf'}
 def allowed_file(filename):
@@ -662,12 +655,41 @@ API_KEY = os.getenv('GOOGLE_API_KEY')
 if not API_KEY:
     raise ValueError("GOOGLE_API_KEY environment variable is not set")
 
-chatbot = EnhancedMultiFormatChatbot(API_KEY)
+# --- SESSION MANAGER ---
+active_sessions = {}
+session_lock = Lock()
+SESSION_TIMEOUT = 3600  # 1 hour timeout
+
+def get_user_chatbot(user_id):
+    """Retrieves or creates a chatbot instance for a specific user."""
+    with session_lock:
+        current_time = time.time()
+        
+        # Clean up old sessions to prevent memory leaks
+        expired_users = [uid for uid, data in active_sessions.items() 
+                         if current_time - data['last_active'] > SESSION_TIMEOUT]
+        for uid in expired_users:
+            del active_sessions[uid]
+            
+        # Create new or update existing session
+        if user_id not in active_sessions:
+            print(f"[DEBUG] Creating new chatbot instance for user: {user_id}")
+            active_sessions[user_id] = {
+                'bot': EnhancedMultiFormatChatbot(API_KEY),
+                'last_active': current_time
+            }
+        else:
+            active_sessions[user_id]['last_active'] = current_time
+            
+        return active_sessions[user_id]['bot']
 
 @app.route('/')
 # def home():
 #     return render_template('index.html')
 def index():
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+        
     now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"logs/chat_{now}.txt"
     session['chat_log_path'] = filename
@@ -682,6 +704,8 @@ def avatar():
     return render_template("avatar.html")
 
 @app.route('/upload', methods=['POST'])
+@app.route('/upload', methods=['POST'])
+
 def upload_files():
     print("[DEBUG] Entered /upload route")
     if 'file' not in request.files:
@@ -694,46 +718,42 @@ def upload_files():
     if not files or all(file.filename=='' for file in files):
         return jsonify({'error': 'no files selected'}), 400
     
+    # 1. FETCH THE USER'S SPECIFIC CHATBOT INSTANCE
+    user_id = session.get('user_id')
+    user_chatbot = get_user_chatbot(user_id)
 
-    # if files.filename == "":
-    #     return jsonify({'error': 'No selected file'}), 400
-    uploaded_files=[]
-    session['uploaded_files']=[]
-
-    combined_text=""
-    # success_files=[]
-    # failed_files=[]
+    uploaded_files = []
     
-    print("DEBUG allowed_file is:", allowed_file)
+    # Reset uploaded files in session for a new upload batch
+    session['uploaded_files'] =[]
+    combined_text = ""
 
+    print("DEBUG allowed_file is:", allowed_file)
 
     for file in files:
         if allowed_file(file.filename):  
             filename = str(uuid.uuid4()) + os.path.splitext(file.filename)[1]
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
-
-            if 'uploaded_files' not in session:
-                session['uploaded_files']=[]
     
             session['uploaded_files'].append(filepath)
             uploaded_files.append(filename)
 
-            load_success = chatbot.load_file(filepath)
+            # 2. USE user_chatbot INSTEAD OF global chatbot
+            load_success = user_chatbot.load_file(filepath)
 
             combined_text += extract_text_from_pdf(filepath) +"\n\n"
 
-            chatbot.load_combined_text(combined_text)
+            # 3. USE user_chatbot INSTEAD OF global chatbot
+            user_chatbot.load_combined_text(combined_text)
             session['current_file'] = 'multiple_files_combined'
+            session.modified = True # Ensure Flask saves the session array
         else:
             print(f"Skipping unsupported file: {file.filename}")
 
-    # if combined_text:
-    #     chatbot.load_combined_text(combined_text)
-    #     session['current_file'] = 'multiple_files_combined'
-
     if uploaded_files:
-        chatbot.load_combined_text(combined_text)
+        # 4. USE user_chatbot INSTEAD OF global chatbot
+        user_chatbot.load_combined_text(combined_text)
         session['current_file'] = 'multiple_files_combined'
         return jsonify({
             'success': True, 
@@ -746,48 +766,52 @@ def upload_files():
 
 
 @app.route('/ask', methods=['POST'])
+@app.route('/ask', methods=['POST'])
 def ask_question():
     print("[DEBUG] Reached /ask endpoint")
     data = request.get_json()
     print("[DEBUG] Raw JSON received:", data)
 
     question = data.get('question')
-    mute=data.get('mute',False)
-
-    # print(f"received : {question} ,mute: {mute}")
+    mute = data.get('mute', False)
 
     if not question:
         return jsonify({'error': 'No question provided'}), 400
     
-    upload_files=session.get('uploaded_files',[])
+    upload_files = session.get('uploaded_files',[])
 
     if not upload_files:
         return jsonify({'error': 'Please upload a file first'}), 400
     
     # --- Start: Restore chatbot state from session if needed ---
-    combined_text=""
+    combined_text = ""
     
     for filepath in upload_files:
         try:
             combined_text += extract_text_from_pdf(filepath) + "\n\n"
         except Exception as e:
             print(f"[ERROR] Failed to extract text from {filepath}: {e}")
-    prompt = f"{combined_text}\n\nQuestion: {question}"
 
     try:
-        response_text = chatbot.ask_question(question)
+        # 1. FETCH THE USER'S SPECIFIC CHATBOT INSTANCE
+        user_id = session.get('user_id')
+        user_chatbot = get_user_chatbot(user_id)
+
+        # 2. USE user_chatbot INSTEAD OF global chatbot
+        response_text = user_chatbot.ask_question(question)
         print("[DEBUG] Got response:", response_text)
 
         log_conversation(question, response_text)
 
         if not mute:
-            audio_url= generate_polly_audio(response_text)
+            audio_url = generate_polly_audio(response_text)
         else:
-            audio_url=None
+            audio_url = None
+            
         return jsonify({
             'response': response_text, 
-            'audio_url':audio_url
-            })
+            'audio_url': audio_url
+        })
     
     except Exception as e:
         print("[ERROR] Exception occurred while generating response:", str(e))
