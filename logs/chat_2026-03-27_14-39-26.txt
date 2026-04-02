@@ -1,3 +1,0 @@
-User: summarize in 20 words
-Bot: Medicaps University students designed a High Level CI/CD pipeline for a Go Logistics App as a DevOps course project report.
-

@@ -1,3 +1,0 @@
-User: summarize in 20 words
-Bot: This Medicaps University project report from a DevOps course details a High-Level Design for a CI/CD pipeline for a Go (Golang) Logistics App.
-
