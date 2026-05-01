@@ -1,0 +1,21 @@
+flask
+google-generativeai
+python-dotenv
+pdfplumber
+PyPDF2
+python-docx
+Pillow
+pytesseract
+opencv-python-headless
+pandas
+tabulate
+requests
+edge-tts
+pytest
+
+# --- New LangChain & RAG Stack ---
+langchain
+langchain-community
+langchain-google-genai
+chromadb
+pypdf
