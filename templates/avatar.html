@@ -4,71 +4,60 @@
   <meta charset="UTF-8" />
   <title>Speaking Avatar</title>  
   <style>
-    body { margin: 0; background: #ffffff; }
-    #avatar-container {
-      position: fixed;
-      bottom: 80px;
-      right: 30px;
-      width: 300px;
-      height: 300px;
-      z-index: 999;
+    #avatar-wrapper {
+        position: fixed;
+        /* Moved up slightly to clear the input bar */
+        bottom: 90px; 
+        right: 3vw;
+        /* Dynamically scales based on screen size */
+        width: clamp(150px, 25vw, 350px);
+        height: clamp(150px, 25vw, 350px);
+        /* Set Z-index lower than the chatbar so it goes behind it */
+        z-index: 40; 
+        pointer-events: none; 
     }
-    #speakBtn {
-      position: fixed;
-      bottom: 330px;
-      right: 20px;
-      z-index: 1000;
-      padding: 10px 16px;
-      background-color: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
+    #avatar-wrapper canvas {
+        width: 100% !important;
+        height: 100% !important;
+        outline: none;
+        pointer-events: auto;
     }
-    </style>
+</style>
 </head>
-<body>
-    <div style="position: relative;">
-      <canvas id="avatar-canvas"></canvas>
-      <img src="/static/Logo-Black-TM.png" alt="overlay" style="position: absolute; bottom: -475px; right: 80px; width: 175px; 
-        z-index: 1000;" />
-    </div>
-    <img id="muteIcon" src="{{ url_for('static', filename='mute.png') }}" alt="Muted"
-     style="position: fixed; bottom: 350; right: 80px; width: 40px; z-index: 2000; display: none;" />
 
-    <div id="avatar-container"></div>
+<body>
+    <div id="avatar-wrapper"></div>
 
     <script type="module">
-
         console.log("✅ Avatar module script running");
-        
-        let availableVoices = [];
-        window.speechSynthesis.onvoiceschanged = () => {
-          availableVoices = speechSynthesis.getVoices();
-          console.log("🔊 Voices loaded:", availableVoices.map(v => v.name));
-        };
         
         import * as THREE from 'https://esm.run/three@0.158.0';
         import { GLTFLoader } from 'https://esm.run/three@0.158.0/examples/jsm/loaders/GLTFLoader.js';
 
-        let selectedAvatar = null;
-
-        console.log("🧠 Initial selectedAvatar from localStorage:", selectedAvatar);
-
-        let avatar, jawBone;
-        let handBones = [];
-        
+        let selectedAvatar = localStorage.getItem("selectedAvatar");
         let morphMesh = null;
         let morphDict = null;
         let morphInfluences = null;
 
+        const container = document.getElementById("avatar-wrapper");
+        const width = container.clientWidth || 300;
+        const height = container.clientHeight || 300;
+
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 
-        renderer.setSize(300, 300);
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setClearColor(0x000000, 0);
-        document.getElementById("avatar-container").appendChild(renderer.domElement);
+        container.appendChild(renderer.domElement);
+
+        window.addEventListener('resize', () => {
+            if (!container) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.5));
         const light = new THREE.DirectionalLight(0xffffff, 2);
@@ -77,92 +66,46 @@
 
         camera.position.z = 1.5;
 
-        // 07/07/2025 : male + female avatar
-        let maleAvatar=null, femaleAvatar=null;
+        let maleAvatar = null;
+        let femaleAvatar = null;
 
         if (selectedAvatar === "male" || selectedAvatar === "female"){
           loadAvatar(selectedAvatar);
         }
 
-
         function loadAvatar(gender){
-          console.log("📦 loadAvatar() triggered for:", gender);
           const loader = new GLTFLoader();
           const path = gender === "male" ? "/static/684ff6e2227a9a0422181bcc.glb" : "/static/686b8e703856a81c484ed51e.glb";
-          loader.load(path, (gltf)=>{
+          
+          loader.load(path, (gltf) => {
             const avatar = gltf.scene;
-            console.log("🎉 Avatar loaded:", gender);
-            if (gender ==="female"){
-              avatar.position.y = -2.32;     // Slightly higher/lower if needed
-              avatar.position.x = 0;        // Center or offset if required
+            if (gender === "female"){
+              avatar.position.y = -2.32;     
+              avatar.position.x = 0;        
               avatar.rotation.y = 0.1;
-            }else{
+            } else {
               avatar.position.y = -2.45;
               avatar.rotation.y = 0;
               avatar.position.x = 0;
             }
 
             avatar.scale.set(1.5, 1.5, 1.5);
-
             scene.add(avatar);
-            console.log("🧱 Avatar added to scene");
 
-            if(gender==="male"){
-              maleAvatar=avatar;
-              console.log("📍 Stored as maleAvatar");
-            } else{
-              femaleAvatar=avatar;
-              console.log("📍 Stored as femaleAvatar");
-            }
+            if(gender === "male") maleAvatar = avatar;
+            else femaleAvatar = avatar;
 
             initLipSync(avatar);
             animate();
-          }, undefined,(error)=>{
-            console.error("❌ Failed to load avatar:", error);
-          });
+          }, undefined, (error) => console.error("❌ Failed to load avatar:", error));
         }
-        // const loader = new GLTFLoader();
-        // loader.load('/static/684ff6e2227a9a0422181bcc.glb', function (gltf) {
-        //     console.log("✅ Male Avatar loaded");
-        //     maleAvatar = gltf.scene;
-        //     maleAvatar.scale.set(1.5,1.5,1.5);
-        //     maleAvatar.position.y = -2.45;
-        //     maleAvatar.rotation.y = 0;
-        //     scene.add( maleAvatar);
-
-        //     if (selectedAvatar !== "male") maleAvatar.visible = false;
-        //     initLipSync(maleAvatar);
-        //     animate();
-        //     }, undefined, function (error) {
-        //     console.error("❌ Error loading male avatar:", error);
-        // });
-        
-        // loader.load('/static/686b8e703856a81c484ed51e.glb', function(gltf){
-        //   console.log("✅ Female avatar loaded");
-        //   femaleAvatar = gltf.scene;
-        //   femaleAvatar.scale.set(1.5, 1.5, 1.5);
-        //   femaleAvatar.position.y = -2.45;
-        //   femaleAvatar.rotation.y = 0;
-        //   scene.add(femaleAvatar);
-
-        //   if (selectedAvatar !== "female") femaleAvatar.visible = false;
-        //   initLipSync(femaleAvatar); 
-        // }, undefined, function(error){
-        //   console.error("❌ Error loading female avatar : ", error);
-        // });
 
         function initLipSync(avatarScene){
-          console.log("🔊 initLipSync called");
           avatarScene.traverse((node) =>{
             if (node.isMesh && node.name === "Wolf3D_Head" && node.morphTargetDictionary){
               morphMesh = node;
               morphDict = node.morphTargetDictionary;
               morphInfluences = node.morphTargetInfluences;
-              const smileIndex = morphDict["mouthSmile"];
-              if (smileIndex !== undefined){
-                morphInfluences[smileIndex] = 0.5;
-              }
-              console.log("🎤 Lip sync targets ready");
             }
           });
         }
@@ -172,88 +115,89 @@
           renderer.render(scene, camera);
         }
 
-        // ✅ Lip sync with Web Speech API
-        const synth = window.speechSynthesis;
-        let jawAnim;
+        // Web Audio API Lip Sync & DYNAMIC MUTE LOGIC
+        let audioCtx, analyser, currentAudio, sourceNode;
+        window.isAudioMuted = false; // Global mute state tracking
 
-        function speak(text) {
-          const utter = new SpeechSynthesisUtterance(text);
-          utter.lang = 'en-US';
-          utter.voice = getSelectedVoice();
-          utter.onstart = () => startLipSyncWithUtterance(utter);
-          utter.onend = () => stopLipSync();
-          synth.speak(utter);
-        }
-
-        function getSelectedVoice(){
-          // const voices = speechSynthesis.getVoices();
-          if (!availableVoices || availableVoices.length === 0){
-            console.warn("⚠️ Voices not ready, using fallback.");
-            return null;
-          }
-          const preferredVoice = availableVoices.find(v =>
-            selectedAvatar === "male"
-            ? v.name.includes("David") || v.name.includes("Mark") || v.name.includes("Male")
-            : v.name.includes("Zira") || v.name.includes("Female")
-          );
-          if(!preferredVoice){
-            console.warn("⚠️ Preferred voice not found. Using default: ",availableVoices[0]?.name)
-          }
-          console.log("🎤 Using voice:", preferredVoice?.name);
-          return preferredVoice || availableVoices[0];
-        }
-
-        let lipSyncInterval;
-
-        function startLipSyncWithUtterance(utter, text){
-          if (!morphMesh || !morphDict) return;
-          const mouthOpenIndex = morphDict["mouthOpen"];
-          if (mouthOpenIndex === undefined) return;
-
-          utter.onboundary = (event) =>{
-            if(event.name == "word"){
-              morphInfluences[mouthOpenIndex] = 1.0;
-              setTimeout(() => {
-                morphInfluences[mouthOpenIndex] = 0.0;
-              }, 150);
+        window.setAudioMute = function(muteStatus) {
+            window.isAudioMuted = muteStatus;
+            if (currentAudio) {
+                currentAudio.muted = muteStatus; // Applies dynamic HTML5 muting!
             }
-          };
-        }
-
-        function stopLipSync() {
-          if (!morphMesh || !morphDict) return;
-
-          const mouthOpenIndex = morphDict["mouthOpen"];
-          if (mouthOpenIndex !== undefined) {
-            morphInfluences[mouthOpenIndex] = 0.0;
-          }
-
-          clearInterval(lipSyncInterval);
-        }
-        window.avatarReady = true;
-        window.speak = speak;
-
-        window.setAvatarGender = function(gender){
-          console.log("📥 setAvatarGender() called with:", gender);
-          selectedAvatar = gender;
-          localStorage.setItem("selectedAvatar", gender);
-
-          if ((gender === "male" && !maleAvatar) || (gender === "female" && !femaleAvatar)){
-            console.log("📦 Avatar not loaded yet — calling loadAvatar()");
-            loadAvatar(gender);
-          }
-
-          if (maleAvatar) {
-            maleAvatar.visible = (gender === "male");
-            console.log("👔 maleAvatar.visible =", maleAvatar.visible);
-          }
-          if (femaleAvatar){
-            femaleAvatar.visible = (gender === "female");
-            console.log("👗 femaleAvatar.visible =", femaleAvatar.visible);
-          }
-          console.log("👤 Avatar switched to: ",gender);
         };
 
+        function playAudioAndLipSync(audioUrl) {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.connect(audioCtx.destination);
+                
+                currentAudio = new Audio();
+                currentAudio.crossOrigin = "anonymous";
+                sourceNode = audioCtx.createMediaElementSource(currentAudio);
+                sourceNode.connect(analyser);
+            }
+            
+            currentAudio.src = audioUrl;
+            // Instantly apply the current mute state to the new audio
+            currentAudio.muted = window.isAudioMuted; 
+            
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            function updateLipSync() {
+                if (currentAudio.paused || currentAudio.ended || !morphMesh || !morphDict) return;
+                
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                let average = sum / dataArray.length;
+                
+                let mouthOpenValue = average / 60.0; 
+                if (mouthOpenValue > 1.0) mouthOpenValue = 1.0;
+                if (mouthOpenValue < 0.05) mouthOpenValue = 0.0; 
+                
+                // If audio is dynamically muted, close the mouth so it doesn't flap silently
+                const mouthOpenIndex = morphDict["mouthOpen"];
+                if (mouthOpenIndex !== undefined) {
+                    morphInfluences[mouthOpenIndex] = window.isAudioMuted ? 0.0 : mouthOpenValue;
+                }
+                
+                requestAnimationFrame(updateLipSync);
+            }
+
+            currentAudio.onplay = () => {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                updateLipSync(); 
+            };
+
+            currentAudio.onended = () => {
+                const mouthOpenIndex = morphDict["mouthOpen"];
+                if (mouthOpenIndex !== undefined) morphInfluences[mouthOpenIndex] = 0.0;
+            };
+
+            currentAudio.play().catch(e => console.error("Audio play failed:", e));
+        }
+
+        window.avatarReady = true;
+        window.playAudioAndLipSync = playAudioAndLipSync;
+
+        window.setAvatarGender = function(gender) {
+            if (!gender) return;
+            selectedAvatar = gender;
+            localStorage.setItem("selectedAvatar", gender);
+
+            if (maleAvatar) maleAvatar.visible = false;
+            if (femaleAvatar) femaleAvatar.visible = false;
+
+            if (gender === "male") {
+                if (!maleAvatar) loadAvatar("male");
+                else maleAvatar.visible = true;
+            } else if (gender === "female") {
+                if (!femaleAvatar) loadAvatar("female");
+                else femaleAvatar.visible = true;
+            }
+        };
     </script>
 </body>
 </html>
